@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>APACHE II 评分计算器</title>
+    <!-- Tailwind CDN (for quick no-build deploy) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React 18 + ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel for in-browser JSX transform (quick start). For production, prefer a build step (Vite). -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      @media print { .btn { display: none } details { display:none } }
+    </style>
+  </head>
+  <body class="min-h-screen bg-gray-50 text-gray-900">
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useMemo, useState } = React;
+
+      function ApacheIICalculator() {
+        const [vals, setVals] = useState({
+          tempC: "", map: "", sbp: "", dbp: "", hr: "", rr: "",
+          oxyMode: "pao2", pao2: "", aado2: "",
+          ph: "", hco3: "",
+          na: "", k: "", cr: "", crUnit: "mgdl", acuteRenalFailure: false,
+          hct: "", wbc: "", gcs: "",
+          age: "", chronic: "none",
+        });
+        const num = (v) => { if (v === null || v === undefined || v === "") return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
+        const clamp = (x, lo, hi) => { if (x == null) return x; return Math.max(lo, Math.min(hi, x)); };
+        const scoreTemp = (tC) => { if (tC == null) return 0; if (tC >= 41) return 4; if (tC >= 39 && tC <= 40.9) return 3; if (tC >= 38.5 && tC <= 38.9) return 1; if (tC >= 36 && tC <= 38.4) return 0; if (tC >= 34 && tC <= 35.9) return 1; if (tC >= 32 && tC <= 33.9) return 2; if (tC >= 30 && tC <= 31.9) return 3; if (tC < 29.9) return 4; return 0; };
+        const scoreMAP = (map) => { if (map == null) return 0; if (map >= 160) return 4; if (map >= 130 && map <= 159) return 3; if (map >= 110 && map <= 129) return 2; if (map >= 70 && map <= 109) return 0; if (map >= 50 && map <= 69) return 2; if (map < 50) return 4; return 0; };
+        const scoreHR = (hr) => { if (hr == null) return 0; if (hr >= 180) return 4; if (hr >= 140 && hr <= 179) return 3; if (hr >= 110 && hr <= 139) return 2; if (hr >= 70 && hr <= 109) return 0; if (hr >= 55 && hr <= 69) return 2; if (hr >= 40 && hr <= 54) return 3; if (hr < 40) return 4; return 0; };
+        const scoreRR = (rr) => { if (rr == null) return 0; if (rr >= 50) return 4; if (rr >= 35 && rr <= 49) return 3; if (rr >= 25 && rr <= 34) return 1; if (rr >= 12 && rr <= 24) return 0; if (rr >= 10 && rr <= 11) return 1; if (rr >= 6 && rr <= 9) return 2; if (rr <= 5) return 4; return 0; };
+        const scoreOxy = (mode, pao2, aado2) => { if (mode === "aado2") { if (aado2 == null) return 0; if (aado2 > 500) return 4; if (aado2 >= 350 && aado2 <= 499) return 3; if (aado2 >= 200 && aado2 <= 349) return 2; if (aado2 < 200) return 0; return 0; } else { if (pao2 == null) return 0; if (pao2 > 70) return 0; if (pao2 >= 61 && pao2 <= 70) return 1; if (pao2 >= 55 && pao2 <= 60) return 3; if (pao2 < 55) return 4; return 0; } };
+        const scorePH = (ph) => { if (ph == null) return 0; if (ph >= 7.70) return 4; if (ph >= 7.60 && ph <= 7.69) return 3; if (ph >= 7.50 && ph <= 7.59) return 1; if (ph >= 7.33 && ph <= 7.49) return 0; if (ph >= 7.25 && ph <= 7.32) return 2; if (ph >= 7.15 && ph <= 7.24) return 3; if (ph < 7.15) return 4; return 0; };
+        const scoreHCO3 = (h) => { if (h == null) return 0; if (h >= 52) return 4; if (h >= 41 && h <= 51.9) return 3; if (h >= 32 && h <= 40.9) return 1; if (h >= 22 && h <= 31.9) return 0; if (h >= 18 && h <= 21.9) return 1; if (h >= 15 && h <= 17.9) return 2; if (h >= 10 && h <= 14.9) return 3; if (h < 10) return 4; return 0; };
+        const scoreNa = (na) => { if (na == null) return 0; if (na >= 180) return 4; if (na >= 160 && na <= 179) return 3; if (na >= 155 && na <= 159) return 2; if (na >= 150 && na <= 154) return 1; if (na >= 130 && na <= 149) return 0; if (na >= 120 && na <= 129) return 2; if (na >= 111 && na <= 119) return 3; if (na <= 110) return 4; return 0; };
+        const scoreK = (k) => { if (k == null) return 0; if (k >= 7.0) return 4; if (k >= 6.0 && k <= 6.9) return 3; if (k >= 5.5 && k <= 5.9) return 1; if (k >= 3.5 && k <= 5.4) return 0; if (k >= 3.0 && k <= 3.4) return 1; if (k >= 2.5 && k <= 2.9) return 2; if (k < 2.5) return 4; return 0; };
+        const scoreCr = (crMgdl, arf) => { if (crMgdl == null) return 0; let pts = 0; if (crMgdl >= 3.5) pts = 4; else if (crMgdl >= 2.0 && crMgdl <= 3.4) pts = 3; else if (crMgdl >= 1.5 && crMgdl <= 1.9) pts = 2; else if (crMgdl >= 0.6 && crMgdl <= 1.4) pts = 0; else if (crMgdl < 0.6) pts = 2; return arf ? pts * 2 : pts; };
+        const scoreHct = (h) => { if (h == null) return 0; if (h >= 60) return 4; if (h >= 50 && h <= 59.9) return 2; if (h >= 46 && h <= 49.9) return 1; if (h >= 30 && h <= 45.9) return 0; if (h >= 20 && h <= 29.9) return 2; if (h < 20) return 4; return 0; };
+        const scoreWBC = (w) => { if (w == null) return 0; if (w >= 40) return 4; if (w >= 20 && w <= 39.9) return 2; if (w >= 15 && w <= 19.9) return 1; if (w >= 3.0 && w <= 14.9) return 0; if (w >= 1.0 && w <= 2.9) return 2; if (w < 1.0) return 4; return 0; };
+        const scoreGCS = (g) => { if (g == null) return 0; const gg = clamp(g, 3, 15); return 15 - gg; };
+        const agePoints = (a) => { if (a == null) return 0; if (a <= 44) return 0; if (a >= 45 && a <= 54) return 2; if (a >= 55 && a <= 64) return 3; if (a >= 65 && a <= 74) return 5; if (a >= 75) return 6; return 0; };
+        const chronicPoints = (ch) => { switch (ch) { case "elective": return 2; case "nonElective": return 5; default: return 0; } };
+        const computeAADO2 = ({ fio2, paco2, pao2, pb = 760, ph2o = 47, R = 0.8 }) => { if ([fio2, paco2, pao2].some((x) => x == null)) return null; const PAO2 = fio2 * (pb - ph2o) - paco2 / R; return PAO2 - pao2; };
+        const crMgdl = React.useMemo(() => { const c = num(vals.cr); if (c == null) return null; return vals.crUnit === "mgdl" ? c : c / 88.4; }, [vals.cr, vals.crUnit]);
+        const mapAuto = React.useMemo(() => { const s = num(vals.sbp); const d = num(vals.dbp); if (s == null || d == null) return null; return Math.round(((s + 2 * d) / 3) * 10) / 10; }, [vals.sbp, vals.dbp]);
+        const mapUse = React.useMemo(() => { const m = num(vals.map); return m != null ? m : mapAuto; }, [vals.map, mapAuto]);
+        const derived = useMemo(() => {
+          const t = num(vals.tempC);
+          const hr = num(vals.hr);
+          const rr = num(vals.rr);
+          const oxyPts = scoreOxy(vals.oxyMode, num(vals.pao2), num(vals.aado2));
+          const ph = num(vals.ph);
+          const hco3 = num(vals.hco3);
+          const acidBasePts = ph != null ? scorePH(ph) : scoreHCO3(hco3);
+          const na = num(vals.na); const k = num(vals.k); const hct = num(vals.hct); const wbc = num(vals.wbc); const gcs = num(vals.gcs); const age = num(vals.age);
+          const breakdown = {
+            "温度Temp": scoreTemp(t),
+            "MAP": scoreMAP(mapUse),
+            "心率HR": scoreHR(hr),
+            "呼吸频率RR": scoreRR(rr),
+            "氧合Oxygenation": oxyPts,
+            "酸碱pH_or_HCO3": acidBasePts,
+            "钠Na": scoreNa(na),
+            "钾K": scoreK(k),
+            "肌酐Creatinine": scoreCr(crMgdl, vals.acuteRenalFailure),
+            "细胞比容Hct": scoreHct(hct),
+            "白细胞WBC": scoreWBC(wbc),
+            "神志GCS_pts": scoreGCS(gcs),
+          };
+          const APS = Object.values(breakdown).reduce((a, b) => a + (b || 0), 0);
+          const AgePts = agePoints(age);
+          const ChronicPts = chronicPoints(vals.chronic);
+          return { breakdown, APS, AgePts, ChronicPts, Total: APS + AgePts + ChronicPts };
+        }, [vals, mapUse, crMgdl]);
+        const set = (k, v) => setVals((s) => ({ ...s, [k]: v }));
+        const reset = () => setVals({ tempC: "", map: "", sbp: "", dbp: "", hr: "", rr: "", oxyMode: "pao2", pao2: "", aado2: "", ph: "", hco3: "", na: "", k: "", cr: "", crUnit: "mgdl", acuteRenalFailure: false, hct: "", wbc: "", gcs: "", age: "", chronic: "none" });
+        const printPage = () => window.print();
+        const Field = ({ label, hint, unit, children }) => (
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-800">{label}{hint && <span className="ml-1 text-xs text-gray-500">{hint}</span>}</label>
+            {children}
+            {unit && <div className="text-xs text-gray-500">单位: {unit}</div>}
+          </div>
+        );
+        const Card = ({ title, children, right }) => (
+          <div className="rounded-2xl shadow-sm border border-gray-200 bg-white p-4 md:p-6">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold text-gray-800">{title}</h2>
+              {right}
+            </div>
+            <div className="grid grid-cols-1 gap-4">{children}</div>
+          </div>
+        );
+        return (
+          <div className="max-w-6xl mx-auto px-4 py-6 md:py-10">
+            <header className="mb-6">
+              <h1 className="text-2xl md:text-3xl font-bold">APACHE II 评分计算器</h1>
+              <p className="text-sm text-gray-600 mt-2">自动计算急性生理评分（APS）+ 年龄 + 慢性健康状况。填写首次入 ICU 24 小时内最异常值。</p>
+            </header>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:grid-cols-3">
+              <div className="lg:col-span-2 space-y-6">
+                <Card title="生命体征">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Field label="体温 Temp" unit="℃">
+                      <input type="number" step="0.1" className="input w-full rounded-xl border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 bg-white" value={vals.tempC} onChange={(e)=>set("tempC", e.target.value)} placeholder="36.6" />
+                    </Field>
+                    <Field label="平均动脉压 MAP" unit="mmHg" hint="可留空，用下方SBP/DBP自动计算">
+                      <input type="number" step="0.1" className="input w-full rounded-xl border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 bg-white" value={vals.map} onChange={(e)=>set("map", e.target.value)} placeholder="95" />
+                    </Field>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Field label="SBP" unit="mmHg">
+                        <input type="number" className="input w-full rounded-xl border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 bg-white" value={vals.sbp} onChange={(e)=>set("sbp", e.target.value)} placeholder="120" />
+                      </Field>
+                      <Field label="DBP" unit="mmHg" hint={mapAuto!=null?`自动MAP≈${mapAuto}`:""}>
+                        <input type="number" className="input w-full rounded-xl border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 bg-white" value={vals.dbp} onChange={(e)=>set("dbp", e.target.value)} placeholder="70" />
+                      </Field>
+                    </div>
+                    <Field label="心率 HR" unit="次/分">
+                      <input type="number" className="input w-full rounded-xl border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 bg-white" value={vals.hr} onChange={(e)=>set("hr", e.target.value)} placeholder="88" />
+                    </Field>
+                    <Field label="呼吸频率 RR" unit="次/分">
+                      <input type="number" className="input w-full rounded-xl border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 bg-white" value={vals.rr} onChange={(e)=>set("rr", e.target.value)} placeholder="18" />
+                    </Field>
+                  </div>
+                </Card>
+                <Card title="氧合（两者选一）" right={
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-1 text-sm"><input type="radio" name="oxy" value="pao2" checked={vals.oxyMode==='pao2'} onChange={(e)=>set("oxyMode", e.target.value)} />PaO₂</label>
+                    <label className="flex items-center gap-1 text-sm"><input type="radio" name="oxy" value="aado2" checked={vals.oxyMode==='aado2'} onChange={(e)=>set("oxyMode", e.target.value)} />A–aDO₂</label>
+                  </div>
+                }>
+                  {vals.oxyMode === 'pao2' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Field label="动脉氧分压 PaO₂" unit="mmHg" hint=">70=0分; 61–70=1; 55–60=3; <55=4">
+                        <input type="number" className="input w-full rounded-xl border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 bg-white" value={vals.pao2} onChange={(e)=>set("pao2", e.target.value)} placeholder="85" />
+                      </Field>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <Field label="A–aDO₂" unit="mmHg" hint=">500=4; 350–499=3; 200–349=2; <200=0">
+                          <input type="number" className="input w-full rounded-xl border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 bg-white" value={vals.aado2} onChange={(e)=>set("aado2", e.target.value)} placeholder="180" />
+                        </Field>
+                      </div>
+                      <details className="rounded-lg border border-gray-200 p-3 bg-gray-50">
+                        <summary className="cursor-pointer text-sm font-medium">需要计算 A–aDO₂？（基于肺泡气方程）</summary>
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mt-3">
+                          <Field label="FiO₂" hint="小数，如40%=0.40"><input id="fio2" type="number" step="0.01" className="input w-full rounded-xl border border-gray-300 px-3 py-2" placeholder="0.21" /></Field>
+                          <Field label="PaCO₂" unit="mmHg"><input id="paco2" type="number" className="input w-full rounded-xl border border-gray-300 px-3 py-2" placeholder="40" /></Field>
+                          <Field label="PaO₂" unit="mmHg"><input id="pao2_help" type="number" className="input w-full rounded-xl border border-gray-300 px-3 py-2" placeholder="80" /></Field>
+                          <Field label="Pb" unit="mmHg" hint="大气压, 默认760"><input id="pb" type="number" className="input w-full rounded-xl border border-gray-300 px-3 py-2" placeholder="760" /></Field>
+                          <Field label="R" hint="呼吸商, 默认0.8"><input id="rq" type="number" step="0.05" className="input w-full rounded-xl border border-gray-300 px-3 py-2" placeholder="0.8" /></Field>
+                        </div>
+                        <div className="mt-3 flex gap-2">
+                          <button className="btn inline-flex items-center justify-center rounded-2xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-100" onClick={() => {
+                            const numOrNull = (id) => { const v = document.getElementById(id).value; if (v === "" || v == null) return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
+                            const fio2 = numOrNull("fio2");
+                            const paco2 = numOrNull("paco2");
+                            const pao2h = numOrNull("pao2_help");
+                            const pb = numOrNull("pb") ?? 760;
+                            const rq = numOrNull("rq") ?? 0.8;
+                            const ph2o = 47;
+                            if ([fio2, paco2, pao2h].some((x)=>x==null)) return;
+                            const PAO2 = fio2 * (pb - ph2o) - paco2 / rq;
+                            const aado2 = PAO2 - pao2h;
+                            if (Number.isFinite(aado2)) setVals((s)=>({ ...s, aado2: Math.round(aado2) }));
+                          }}>计算并填入 A–aDO₂</button>
+                        </div>
+                      </details>
+                    </div>
+                  )}
+                </Card>
+                <Card title="酸碱、电解质与肾功能">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Field label="动脉血 pH (优先)" hint="若缺失，将使用HCO₃⁻评分">
+                      <input type="number" step="0.01" className="input w-full rounded-xl border border-gray-300 px-3 py-2" value={vals.ph} onChange={(e)=>set("ph", e.target.value)} placeholder="7.40" />
+                    </Field>
+                    <Field label="血HCO₃⁻" unit="mmol/L" hint="仅在无pH时用于评分">
+                      <input type="number" step="0.1" className="input w-full rounded-xl border border-gray-300 px-3 py-2" value={vals.hco3} onChange={(e)=>set("hco3", e.target.value)} placeholder="24" />
+                    </Field>
+                    <Field label="血钠 Na" unit="mmol/L">
+                      <input type="number" step="0.1" className="input w-full rounded-xl border border-gray-300 px-3 py-2" value={vals.na} onChange={(e)=>set("na", e.target.value)} placeholder="140" />
+                    </Field>
+                    <Field label="血钾 K" unit="mmol/L">
+                      <input type="number" step="0.1" className="input w-full rounded-xl border border-gray-300 px-3 py-2" value={vals.k} onChange={(e)=>set("k", e.target.value)} placeholder="4.2" />
+                    </Field>
+                    <Field label="肌酐 Creatinine">
+                      <div className="flex gap-2">
+                        <input type="number" step="0.01" className="input w-full rounded-xl border border-gray-300 px-3 py-2" value={vals.cr} onChange={(e)=>set("cr", e.target.value)} placeholder={vals.crUnit==="mgdl"?"1.0":"88"} />
+                        <select className="select w-28 rounded-xl border border-gray-300 px-3 py-2" value={vals.crUnit} onChange={(e)=>set("crUnit", e.target.value)}>
+                          <option value="mgdl">mg/dL</option>
+                          <option value="umolL">µmol/L</option>
+                        </select>
+                      </div>
+                      <label className="mt-2 inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={vals.acuteRenalFailure} onChange={(e)=>set("acuteRenalFailure", e.target.checked)} />急性肾衰（评分×2）</label>
+                    </Field>
+                  </div>
+                </Card>
+                <Card title="血液与神志">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Field label="血细胞比容 Hct" unit="%">
+                      <input type="number" step="0.1" className="input w-full rounded-xl border border-gray-300 px-3 py-2" value={vals.hct} onChange={(e)=>set("hct", e.target.value)} placeholder="40" />
+                    </Field>
+                    <Field label="白细胞 WBC" unit="×10⁹/L">
+                      <input type="number" step="0.1" className="input w-full rounded-xl border border-gray-300 px-3 py-2" value={vals.wbc} onChange={(e)=>set("wbc", e.target.value)} placeholder="8" />
+                    </Field>
+                    <Field label="GCS (3–15)">
+                      <input type="number" className="input w-full rounded-xl border border-gray-300 px-3 py-2" value={vals.gcs} onChange={(e)=>set("gcs", e.target.value)} placeholder="15" min={3} max={15} />
+                    </Field>
+                  </div>
+                </Card>
+                <Card title="年龄与慢性健康状况">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Field label="年龄 Age" unit="岁"><input type="number" className="input w-full rounded-xl border border-gray-300 px-3 py-2" value={vals.age} onChange={(e)=>set("age", e.target.value)} placeholder="63" /></Field>
+                    <Field label="慢性健康状况 (近1年)" hint="严重心/肺/肝/肾功能不全或免疫抑制">
+                      <select className="select w-full rounded-xl border border-gray-300 px-3 py-2" value={vals.chronic} onChange={(e)=>set("chronic", e.target.value)}>
+                        <option value="none">无 / None</option>
+                        <option value="elective">择期术后 (2分)</option>
+                        <option value="nonElective">医疗/非择期手术 (5分)</option>
+                      </select>
+                    </Field>
+                  </div>
+                </Card>
+                <div className="flex gap-3">
+                  <button className="btn inline-flex items-center justify-center rounded-2xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-100" onClick={reset}>清空</button>
+                  <button className="btn inline-flex items-center justify-center rounded-2xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-100" onClick={printPage}>打印/导出PDF</button>
+                </div>
+              </div>
+              <div className="lg:col-span-1 space-y-6">
+                <Card title="评分结果">
+                  <div className="text-sm grid grid-cols-1 gap-2">
+                    {Object.entries(derived.breakdown).map(([k,v]) => (
+                      <div key={k} className="flex items-center justify-between border-b border-dashed border-gray-200 py-1">
+                        <span>{k}</span>
+                        <span className="font-semibold">{v ?? 0}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                    <div className="p-2 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-between"><span>APS</span><span className="font-bold">{derived.APS}</span></div>
+                    <div className="p-2 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-between"><span>年龄分</span><span className="font-bold">{derived.AgePts}</span></div>
+                    <div className="p-2 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-between"><span>慢性健康分</span><span className="font-bold">{derived.ChronicPts}</span></div>
+                  </div>
+                  <div className="mt-4 p-3 rounded-2xl bg-indigo-50 border border-indigo-200">
+                    <div className="text-sm text-indigo-900">APACHE II 总分</div>
+                    <div className="text-3xl font-extrabold">{derived.Total}</div>
+                  </div>
+                  <p className="mt-3 text-xs text-gray-500">注：本工具仅计算标准 APACHE II 分数。死亡风险估计需结合诊断类别等回归模型。</p>
+                </Card>
+                <Card title="使用说明">
+                  <ul className="list-disc pl-5 text-sm text-gray-700 space-y-2">
+                    <li>输入入 ICU 24 小时内的<strong>最异常</strong>值。</li>
+                    <li>FiO₂ ≥ 0.5 或机械通气时，优先使用 A–aDO₂；否则可使用 PaO₂。</li>
+                    <li>缺失的变量按 0 分处理；请尽量完善数据。</li>
+                    <li>点击“打印/导出PDF”可保存报告。</li>
+                  </ul>
+                </Card>
+              </div>
+            </div>
+            <footer className="mt-8 text-xs text-gray-500">© <span id="y"></span> APACHE II Calculator • For educational & clinical reference. Verify against local protocols.</footer>
+          </div>
+        );
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<ApacheIICalculator />);
+      document.getElementById('y').textContent = new Date().getFullYear();
+    </script>
+  </body>
+</html>
